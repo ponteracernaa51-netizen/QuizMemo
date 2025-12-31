@@ -1,0 +1,203 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="dashboard-container">
+
+    <div style="display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 40px;">
+        <!-- Create New Deck -->
+        <div class="card" style="flex: 1; min-width: 300px;">
+            <h3>📂 Create Deck</h3>
+            <form action="/upload" method="post" enctype="multipart/form-data" style="margin-top: 15px;">
+                <input type="text" name="title" placeholder="Deck Title" required>
+                <div style="display: flex; gap: 10px;">
+                    <input type="file" name="file" accept=".xlsx" required style="margin-bottom: 0;">
+                    <button type="submit" class="btn btn-primary">Upload</button>
+                </div>
+                <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 10px;">Supported format: .xlsx</p>
+            </form>
+        </div>
+
+        <!-- Join Deck -->
+        <div class="card" style="flex: 1; min-width: 300px;">
+            <h3>🔗 Join Deck</h3>
+            <form action="/join" method="post" style="margin-top: 15px;">
+                <input type="text" name="code" placeholder="Enter 6-digit code" required>
+                <button type="submit" class="btn btn-primary" style="width: 100%;">Join</button>
+            </form>
+            <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 10px;">Ask the deck owner for the code
+            </p>
+        </div>
+    </div>
+
+    <div class="flex-between">
+        <h2>My Decks</h2>
+        <!-- Future: Add sort/filter here -->
+    </div>
+
+    <div class="dashboard-grid">
+        {% for d in decks %}
+        <div class="card deck-card">
+            <div class="deck-actions">
+                {% if d.created_by == session['user']['id'] %}
+                <button class="action-btn" onclick="location.href='/deck/{{ d.id }}/edit'"
+                    title="Edit Cards">✏️</button>
+                <button class="action-btn" onclick="showRenameModal('{{ d.id }}', '{{ d.title }}')"
+                    title="Rename">⚙️</button>
+                {% endif %}
+                <button class="action-btn" onclick="openCustomStudyModal('{{ d.id }}')"
+                    title="Study Options">🎓</button>
+
+                <form action="/deck/{{ d.id }}/delete" method="POST" onsubmit="return confirm('Are you sure?')"
+                    style="display: inline;">
+                    <button type="submit" class="action-btn"
+                        style="background: rgba(239, 68, 68, 0.2); color: var(--danger);" title="Delete">🗑</button>
+                </form>
+            </div>
+
+            <div>
+                <h3 class="deck-title">{{ d.title }}</h3>
+                <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 15px;">
+                    Code: <code
+                        style="background: rgba(255,255,255,0.1); padding: 2px 5px; border-radius: 4px;">{{ d.access_code }}</code>
+                </p>
+            </div>
+
+            <div class="deck-stats">
+                <div class="stat-item">
+                    <span class="stat-value new">{{ d.stats.new }}</span>
+                    New
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value learn">{{ d.stats.red }}</span>
+                    Learn
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value review">{{ d.stats.green }}</span>
+                    Review
+                </div>
+            </div>
+
+            <a href="/study/{{ d.id }}" class="btn btn-primary" style="margin-top: 20px; width: 100%;">Start
+                Studying</a>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Modals -->
+<div id="renameModal" class="modal">
+    <div class="modal-content">
+        <h3>Rename Deck</h3>
+        <form id="renameForm" method="POST" style="margin-top: 20px;">
+            <input type="text" name="title" id="newTitleInput" required>
+            <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+                <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div id="customStudyModal" class="modal">
+    <div class="modal-content">
+        <div class="flex-between" style="margin-bottom: 20px;">
+            <h3>Study Options</h3>
+            <button onclick="closeCustomModal()"
+                style="background:none; border:none; color:white; font-size: 1.5rem; cursor:pointer;">&times;</button>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 15px;">
+            <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                <input type="radio" name="customAction" value="add_new" checked>
+                <span>Add new cards for today</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                <input type="radio" name="customAction" value="forgotten">
+                <span>Review forgotten cards</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                <input type="radio" name="customAction" value="preview">
+                <span>Review ahead (Preview)</span>
+            </label>
+        </div>
+
+        <div style="margin-top: 20px; padding: 15px; background: rgba(0,0,0,0.2); border-radius: 10px;">
+            <p>Available: <span id="availableCount" style="font-weight: bold; color: var(--primary);">0</span></p>
+            <div style="margin-top: 10px;">
+                <span style="font-size: 0.9rem;">Count:</span>
+                <input type="number" id="customCount" value="20" min="1" style="margin-bottom: 0; margin-top: 5px;">
+            </div>
+        </div>
+
+        <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+            <button class="btn btn-secondary" onclick="closeCustomModal()">Cancel</button>
+            <button class="btn btn-primary" onclick="applyCustomStudy()">Apply</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- Rename Modal ---
+    function showRenameModal(id, currentTitle) {
+        document.getElementById('renameForm').action = '/deck/' + id + '/rename';
+        document.getElementById('newTitleInput').value = currentTitle;
+        document.getElementById('renameModal').style.display = 'block';
+    }
+    function closeModal() {
+        document.getElementById('renameModal').style.display = 'none';
+    }
+
+    // --- Custom Study Modal ---
+    let currentDeckIdForCustom = null;
+    let cachedStats = null;
+
+    async function openCustomStudyModal(deckId) {
+        currentDeckIdForCustom = deckId;
+        const modal = document.getElementById('customStudyModal');
+        modal.style.display = 'block';
+
+        try {
+            const res = await fetch(`/api/deck/${deckId}/stats`);
+            cachedStats = await res.json();
+            updateAvailableCount();
+        } catch (e) { console.error(e); }
+
+        document.querySelectorAll('input[name="customAction"]').forEach(radio => {
+            radio.addEventListener('change', updateAvailableCount);
+        });
+    }
+
+    function updateAvailableCount() {
+        if (!cachedStats) return;
+        const action = document.querySelector('input[name="customAction"]:checked').value;
+        let count = 0;
+        if (action === 'add_new') count = cachedStats.new;
+        else if (action === 'forgotten') count = cachedStats.forgotten;
+        else if (action === 'preview') count = cachedStats.total;
+        document.getElementById('availableCount').innerText = count;
+    }
+
+    function closeCustomModal() {
+        document.getElementById('customStudyModal').style.display = 'none';
+    }
+
+    async function applyCustomStudy() {
+        const action = document.querySelector('input[name="customAction"]:checked').value;
+        const count = document.getElementById('customCount').value;
+        if (!currentDeckIdForCustom) return;
+
+        try {
+            const res = await fetch(`/api/deck/${currentDeckIdForCustom}/apply_custom`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: action, count: count })
+            });
+            if (res.ok) location.reload();
+        } catch (e) { alert("Error"); }
+    }
+
+    window.onclick = function (event) {
+        if (event.target == document.getElementById('renameModal')) closeModal();
+        if (event.target == document.getElementById('customStudyModal')) closeCustomModal();
+    }
+</script>
+{% endblock %}

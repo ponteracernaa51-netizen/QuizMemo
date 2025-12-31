@@ -1,0 +1,212 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="study-container">
+    <div id="loading" class="text-center">
+        <h3>Loading cards...</h3>
+    </div>
+
+    <div id="study-area" class="hidden">
+        <div class="flex-between" style="margin-bottom: 20px; color: var(--text-muted);">
+            <span id="progress-text">Card 1 of 10</span>
+            <a href="/dashboard" style="font-size: 0.9rem;">Finish</a>
+        </div>
+
+        <!-- FLASHCARD MODE (Flip) -->
+        <div id="mode-flashcard" class="flashcard hidden" onclick="flipCard()">
+            <div class="card-face card-front">
+                <div id="fc-question">Question</div>
+                <div style="position: absolute; bottom: 20px; font-size: 0.8rem; color: #94a3b8;">Click to show answer
+                </div>
+            </div>
+            <div class="card-face card-back">
+                <div id="fc-answer">Answer</div>
+            </div>
+        </div>
+
+        <!-- QUIZ MODE (Options) -->
+        <div id="mode-quiz" class="hidden" style="width: 100%; max-width: 600px; margin: 0 auto;">
+            <div class="card"
+                style="min-height: 200px; display: flex; align-items: center; justify-content: center; padding: 30px; margin-bottom: 30px; text-align: center; font-size: 1.3rem;">
+                <span id="quiz-question">Question</span>
+            </div>
+
+            <div id="quiz-options" class="quiz-grid">
+                <!-- Options will be injected here -->
+            </div>
+        </div>
+
+        <!-- RATING CONTROLS (Hidden initially) -->
+        <div id="controls" class="hidden" style="margin-top: 30px;">
+            <div class="rating-buttons">
+                <button class="rate-btn rate-again" onclick="rateCard(0)">Again<br><span
+                        class="small-text">1m</span></button>
+                <button class="rate-btn rate-hard" onclick="rateCard(1)">Hard<br><span
+                        class="small-text">10m</span></button>
+                <button class="rate-btn rate-good" onclick="rateCard(2)">Good<br><span
+                        class="small-text">1d</span></button>
+                <button class="rate-btn rate-easy" onclick="rateCard(3)">Easy<br><span
+                        class="small-text">4d</span></button>
+            </div>
+        </div>
+    </div>
+
+    <div id="finished" class="hidden text-center">
+        <h2>🎉 Congratulations!</h2>
+        <p style="margin-bottom: 30px; color: var(--text-muted);">You have finished all scheduled cards for today.</p>
+        <a href="/dashboard" class="btn btn-primary">Back to Dashboard</a>
+    </div>
+</div>
+
+<style>
+    .small-text {
+        font-size: 0.7rem;
+        opacity: 0.8;
+        font-weight: normal;
+    }
+
+    .quiz-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 15px;
+    }
+
+    .quiz-btn {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        color: white;
+        padding: 20px;
+        border-radius: 12px;
+        cursor: pointer;
+        font-size: 1rem;
+        transition: 0.2s;
+    }
+
+    .quiz-btn:hover {
+        background: rgba(255, 255, 255, 0.1);
+    }
+
+    .quiz-btn.correct {
+        background: var(--success);
+        border-color: var(--success);
+    }
+
+    .quiz-btn.wrong {
+        background: var(--danger);
+        border-color: var(--danger);
+        opacity: 0.5;
+    }
+</style>
+
+<script>
+    const deckId = {{ deck_id }};
+    let cards = [];
+    let currentIndex = 0;
+    let isFlipped = false;
+    let isQuizAnswered = false;
+
+    // Load cards
+    fetch(`/api/cards/${deckId}`)
+        .then(r => r.json())
+        .then(data => {
+            cards = data;
+            document.getElementById('loading').classList.add('hidden');
+            if (cards.length > 0) {
+                document.getElementById('study-area').classList.remove('hidden');
+                showCard();
+            } else {
+                document.getElementById('finished').classList.remove('hidden');
+            }
+        });
+
+    function showCard() {
+        if (currentIndex >= cards.length) {
+            document.getElementById('study-area').classList.add('hidden');
+            document.getElementById('finished').classList.remove('hidden');
+            return;
+        }
+
+        const card = cards[currentIndex];
+        document.getElementById('progress-text').innerText = `Card ${currentIndex + 1} of ${cards.length}`;
+        document.getElementById('controls').classList.add('hidden');
+
+        // Determine Mode
+        // Check if options exist and are not empty/nan
+        const hasOptions = card.options && card.options.length > 0 && card.options[0] !== 'nan' && card.options[0] !== '';
+
+        if (hasOptions) {
+            // QUIZ MODE
+            document.getElementById('mode-flashcard').classList.add('hidden');
+            document.getElementById('mode-quiz').classList.remove('hidden');
+
+            document.getElementById('quiz-question').innerText = card.question_text;
+            const optsContainer = document.getElementById('quiz-options');
+            optsContainer.innerHTML = '';
+            isQuizAnswered = false;
+
+            // Shuffle options for display? Or keep order? Let's keep order for now or shuffle if desired.
+            // Usually options in Excel are fixed A,B,C,D.
+            card.options.forEach(opt => {
+                const btn = document.createElement('button');
+                btn.className = 'quiz-btn';
+                btn.innerText = opt;
+                btn.onclick = () => handleQuizAnswer(btn, opt, card.correct_answer);
+                optsContainer.appendChild(btn);
+            });
+
+        } else {
+            // FLASHCARD MODE
+            document.getElementById('mode-quiz').classList.add('hidden');
+            document.getElementById('mode-flashcard').classList.remove('hidden');
+            document.querySelector('.flashcard').classList.remove('flipped');
+            isFlipped = false;
+
+            document.getElementById('fc-question').innerText = card.question_text;
+            document.getElementById('fc-answer').innerText = card.correct_answer;
+        }
+    }
+
+    // --- Flashcard Logic ---
+    function flipCard() {
+        if (isFlipped) return;
+        isFlipped = true;
+        document.querySelector('.flashcard').classList.add('flipped');
+        document.getElementById('controls').classList.remove('hidden');
+    }
+
+    // --- Quiz Logic ---
+    function handleQuizAnswer(btn, selected, correct) {
+        if (isQuizAnswered) return;
+        isQuizAnswered = true;
+
+        if (selected === correct) {
+            btn.classList.add('correct');
+        } else {
+            btn.classList.add('wrong');
+            // Highlight correct one
+            const allBtns = document.querySelectorAll('.quiz-btn');
+            allBtns.forEach(b => {
+                if (b.innerText === correct) b.classList.add('correct');
+            });
+        }
+
+        // Show rating controls
+        document.getElementById('controls').classList.remove('hidden');
+    }
+
+    function rateCard(rating) {
+        const card = cards[currentIndex];
+
+        fetch('/api/rate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                card_id: card.id,
+                rating: rating
+            })
+        });
+
+        currentIndex++;
+        showCard();
+    }
+</script>
+{% endblock %}

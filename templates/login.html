@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="auth-wrapper">
+    <div class="card auth-card">
+        <div class="auth-tabs">
+            <div class="auth-tab active" onclick="switchAuth('login')" id="tab-login">Sign In</div>
+            <div class="auth-tab" onclick="switchAuth('register')" id="tab-register">Sign Up</div>
+        </div>
+
+        <h2 id="auth-title">Welcome Back!</h2>
+        <p class="text-muted" style="margin-bottom: 20px;">Continue your learning journey</p>
+
+        <form action="/auth" method="post">
+            <input type="email" name="email" placeholder="Email" required>
+            <input type="password" name="password" placeholder="Password" required>
+
+            <input type="hidden" name="action" id="auth-action" value="login">
+
+            <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;">
+                <span id="btn-text">Sign In</span>
+            </button>
+        </form>
+    </div>
+</div>
+
+<script>
+    function switchAuth(type) {
+        const title = document.getElementById('auth-title');
+        const btnText = document.getElementById('btn-text');
+        const actionInput = document.getElementById('auth-action');
+        const tabLogin = document.getElementById('tab-login');
+        const tabRegister = document.getElementById('tab-register');
+
+        if (type === 'login') {
+            title.innerText = 'Welcome Back!';
+            btnText.innerText = 'Sign In';
+            actionInput.value = 'login';
+            tabLogin.classList.add('active');
+            tabRegister.classList.remove('active');
+        } else {
+            title.innerText = 'Create Account';
+            btnText.innerText = 'Sign Up';
+            actionInput.value = 'register';
+            tabRegister.classList.add('active');
+            tabLogin.classList.remove('active');
+        }
+    }
+</script>
+{% endblock %}

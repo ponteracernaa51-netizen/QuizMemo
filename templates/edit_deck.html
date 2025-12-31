@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container" style="max-width: 900px;">
+    <div class="flex-between" style="margin-bottom: 30px;">
+        <div style="display: flex; align-items: center; gap: 15px;">
+            <a href="/dashboard" class="btn btn-secondary">← Back</a>
+            <h2>Editor: {{ deck.title }}</h2>
+        </div>
+        <button class="btn btn-primary" onclick="openEditModal()">+ Add Card</button>
+    </div>
+
+    <div class="card">
+        <div id="cards-list">
+            <!-- Cards will be loaded here -->
+            <p class="text-center text-muted">Loading...</p>
+        </div>
+    </div>
+</div>
+
+<!-- Modal for Add/Edit -->
+<div id="cardModal" class="modal">
+    <div class="modal-content">
+        <h3 id="modalTitle">Card</h3>
+        <form id="cardForm" onsubmit="handleSave(event)">
+            <input type="hidden" id="cardId">
+
+            <label style="display:block; margin-top:15px; margin-bottom:5px;">Question</label>
+            <input type="text" id="cardQuestion" required>
+
+            <label style="display:block; margin-top:15px; margin-bottom:5px;">Answer</label>
+            <input type="text" id="cardAnswer" required>
+
+            <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+                <button type="button" class="btn btn-secondary" onclick="closeCardModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    const deckId = {{ deck.id }};
+    let allCards = [];
+
+    // Load cards
+    async function loadCards() {
+        const res = await fetch(`/api/deck/${deckId}/all_cards`);
+        allCards = await res.json();
+        renderCards();
+    }
+
+    function renderCards() {
+        const container = document.getElementById('cards-list');
+        if (allCards.length === 0) {
+            container.innerHTML = '<p class="text-center text-muted" style="padding: 20px;">This deck has no cards yet.</p>';
+            return;
+        }
+
+        let html = '<table style="width: 100%; border-collapse: collapse;">';
+        html += '<tr style="border-bottom: 1px solid var(--border); text-align: left;"><th style="padding: 10px;">Question</th><th style="padding: 10px;">Answer</th><th style="width: 100px;">Actions</th></tr>';
+
+        allCards.forEach(card => {
+            html += `
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                    <td style="padding: 15px;">${card.question_text}</td>
+                    <td style="padding: 15px; color: var(--text-muted);">${card.correct_answer}</td>
+                    <td style="padding: 15px;">
+                        <button class="action-btn" onclick='openEditModal(${JSON.stringify(card)})' title="Edit">✏️</button>
+                        <button class="action-btn" onclick="deleteCard(${card.id})" style="color: var(--danger);" title="Delete">🗑</button>
+                    </td>
+                </tr>
+            `;
+        });
+        html += '</table>';
+        container.innerHTML = html;
+    }
+
+    // Modal Logic
+    function openEditModal(card = null) {
+        const modal = document.getElementById('cardModal');
+        const title = document.getElementById('modalTitle');
+
+        if (card) {
+            title.innerText = 'Edit Card';
+            document.getElementById('cardId').value = card.id;
+            document.getElementById('cardQuestion').value = card.question_text;
+            document.getElementById('cardAnswer').value = card.correct_answer;
+        } else {
+            title.innerText = 'New Card';
+            document.getElementById('cardId').value = '';
+            document.getElementById('cardQuestion').value = '';
+            document.getElementById('cardAnswer').value = '';
+        }
+
+        modal.style.display = 'block';
+    }
+
+    function closeCardModal() {
+        document.getElementById('cardModal').style.display = 'none';
+    }
+
+    async function handleSave(e) {
+        e.preventDefault();
+        const id = document.getElementById('cardId').value;
+        const question = document.getElementById('cardQuestion').value;
+        const answer = document.getElementById('cardAnswer').value;
+
+        const url = id ? '/api/card/update' : '/api/card/add';
+        const body = { deck_id: deckId, question: question, answer: answer };
+        if (id) body.id = id;
+
+        try {
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+
+            if (res.ok) {
+                closeCardModal();
+                loadCards();
+            }
+        } catch (err) { alert('Save error'); }
+    }
+
+    async function deleteCard(id) {
+        if (!confirm('Delete this card?')) return;
+        try {
+            await fetch('/api/card/delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: id })
+            });
+            loadCards();
+        } catch (err) { alert('Delete error'); }
+    }
+
+    // Init
+    loadCards();
+
+    window.onclick = function (event) {
+        if (event.target == document.getElementById('cardModal')) closeCardModal();
+    }
+</script>
+{% endblock %}
