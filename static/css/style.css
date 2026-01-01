@@ -467,3 +467,133 @@ input:focus {
     justify-content: space-between;
     align-items: center;
 }
+
+/* --- Mobile Responsiveness --- */
+@media (max-width: 768px) {
+
+    /* Typography */
+    h1 {
+        font-size: 1.8rem;
+    }
+
+    h2 {
+        font-size: 1.5rem;
+    }
+
+    h3 {
+        font-size: 1.25rem;
+    }
+
+    .container {
+        padding: 0 15px;
+    }
+
+    /* Navbar */
+    .navbar {
+        flex-direction: column;
+        gap: 15px;
+        align-items: flex-start;
+        padding: 15px 0;
+        margin-bottom: 25px;
+    }
+
+    .nav-links {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    /* Dashboard */
+    .dashboard-grid {
+        grid-template-columns: 1fr;
+        /* Stack cards on mobile */
+        gap: 20px;
+    }
+
+    .card {
+        padding: 20px;
+    }
+
+    /* Deck Editor - Transform fields/table */
+    .flex-between {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 15px;
+    }
+
+    .flex-between>div {
+        /* Fix for back button + title container */
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    /* Responsive Table for Cards */
+    #cards-list table,
+    #cards-list thead,
+    #cards-list tbody,
+    #cards-list th,
+    #cards-list td,
+    #cards-list tr {
+        display: block;
+    }
+
+    #cards-list thead {
+        display: none;
+        /* Hide headers */
+    }
+
+    #cards-list tr {
+        margin-bottom: 15px;
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid var(--border) !important;
+        border-radius: 10px;
+        padding: 10px;
+    }
+
+    #cards-list td {
+        padding: 8px 0 !important;
+        border: none !important;
+        text-align: left;
+        display: flex;
+        flex-direction: column;
+    }
+
+    #cards-list td:before {
+        content: attr(data-label);
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        margin-bottom: 4px;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+
+    /* Ensure content in TDs breaks word if needed */
+    #cards-list td {
+        word-break: break-word;
+    }
+
+    /* Study Mode */
+    .study-container {
+        min-height: auto;
+        padding-top: 20px;
+        padding-bottom: 40px;
+    }
+
+    .flashcard {
+        min-height: 300px;
+        padding: 20px;
+        font-size: 1.25rem;
+        margin-bottom: 20px;
+    }
+
+    .rating-buttons {
+        grid-template-columns: 1fr 1fr;
+        /* 2x2 grid */
+    }
+
+    /* Modals */
+    .modal-content {
+        margin: 20% auto;
+        width: 95%;
+        padding: 20px;
+    }
+}

@@ -24,11 +24,25 @@
         <form id="cardForm" onsubmit="handleSave(event)">
             <input type="hidden" id="cardId">
 
+            <label style="display:block; margin-top:15px; margin-bottom:5px;">Type</label>
+            <select id="cardType"
+                style="width: 100%; padding: 10px; border-radius: 5px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white;">
+                <!-- Populated by JS -->
+            </select>
+
             <label style="display:block; margin-top:15px; margin-bottom:5px;">Question</label>
             <input type="text" id="cardQuestion" required>
 
             <label style="display:block; margin-top:15px; margin-bottom:5px;">Answer</label>
             <input type="text" id="cardAnswer" required>
+
+            <div id="optionsContainer" style="display: none;">
+                <label style="display:block; margin-top:15px; margin-bottom:5px;">Options (for Quiz)</label>
+                <input type="text" id="opt1" placeholder="Option 1" style="margin-bottom: 5px;">
+                <input type="text" id="opt2" placeholder="Option 2" style="margin-bottom: 5px;">
+                <input type="text" id="opt3" placeholder="Option 3" style="margin-bottom: 5px;">
+                <input type="text" id="opt4" placeholder="Option 4" style="margin-bottom: 5px;">
+            </div>
 
             <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
                 <button type="button" class="btn btn-secondary" onclick="closeCardModal()">Cancel</button>
@@ -39,8 +53,23 @@
 </div>
 
 <script>
-    const deckId = {{ deck.id }};
+    const deckId = {{ deck.id | tojson }};
     let allCards = [];
+    let cardTypes = [];
+
+    // Load types
+    async function loadTypes() {
+        const res = await fetch('/api/card_types');
+        cardTypes = await res.json();
+        const sel = document.getElementById('cardType');
+        sel.innerHTML = cardTypes.map(t => `<option value="${t.code}">${t.name}</option>`).join('');
+
+        sel.addEventListener('change', () => {
+            const isQuiz = sel.value === 'quiz';
+            document.getElementById('optionsContainer').style.display = isQuiz ? 'block' : 'none';
+        });
+    }
+    loadTypes();
 
     // Load cards
     async function loadCards() {
@@ -62,9 +91,9 @@
         allCards.forEach(card => {
             html += `
                 <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
-                    <td style="padding: 15px;">${card.question_text}</td>
-                    <td style="padding: 15px; color: var(--text-muted);">${card.correct_answer}</td>
-                    <td style="padding: 15px;">
+                    <td data-label="Question" style="padding: 15px;">${card.question_text}</td>
+                    <td data-label="Answer" style="padding: 15px; color: var(--text-muted);">${card.correct_answer}</td>
+                    <td data-label="Actions" style="padding: 15px;">
                         <button class="action-btn" onclick='openEditModal(${JSON.stringify(card)})' title="Edit">✏️</button>
                         <button class="action-btn" onclick="deleteCard(${card.id})" style="color: var(--danger);" title="Delete">🗑</button>
                     </td>
@@ -85,11 +114,31 @@
             document.getElementById('cardId').value = card.id;
             document.getElementById('cardQuestion').value = card.question_text;
             document.getElementById('cardAnswer').value = card.correct_answer;
+
+            // Detect Type
+            const opts = card.options || [];
+            const isQuiz = opts.length === 4 && !opts.every(o => o === 'nan');
+
+            document.getElementById('cardType').value = isQuiz ? 'quiz' : 'basic';
+            document.getElementById('cardType').dispatchEvent(new Event('change'));
+
+            if (isQuiz) {
+                document.getElementById('opt1').value = opts[0];
+                document.getElementById('opt2').value = opts[1];
+                document.getElementById('opt3').value = opts[2];
+                document.getElementById('opt4').value = opts[3];
+            } else {
+                clearOptions();
+            }
+
         } else {
             title.innerText = 'New Card';
             document.getElementById('cardId').value = '';
             document.getElementById('cardQuestion').value = '';
             document.getElementById('cardAnswer').value = '';
+            document.getElementById('cardType').value = 'basic';
+            document.getElementById('cardType').dispatchEvent(new Event('change'));
+            clearOptions();
         }
 
         modal.style.display = 'block';
@@ -99,15 +148,34 @@
         document.getElementById('cardModal').style.display = 'none';
     }
 
+    function clearOptions() {
+        document.getElementById('opt1').value = '';
+        document.getElementById('opt2').value = '';
+        document.getElementById('opt3').value = '';
+        document.getElementById('opt4').value = '';
+    }
+
     async function handleSave(e) {
         e.preventDefault();
         const id = document.getElementById('cardId').value;
         const question = document.getElementById('cardQuestion').value;
         const answer = document.getElementById('cardAnswer').value;
+        const type = document.getElementById('cardType').value;
 
         const url = id ? '/api/card/update' : '/api/card/add';
         const body = { deck_id: deckId, question: question, answer: answer };
         if (id) body.id = id;
+
+        if (type === 'quiz') {
+            body.options = [
+                document.getElementById('opt1').value,
+                document.getElementById('opt2').value,
+                document.getElementById('opt3').value,
+                document.getElementById('opt4').value
+            ];
+        } else {
+            body.options = ["nan", "nan", "nan", "nan"];
+        }
 
         try {
             const res = await fetch(url, {

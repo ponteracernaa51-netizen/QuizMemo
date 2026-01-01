@@ -7,6 +7,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from database import supabase
 from sm2 import calculate_sm2
 from datetime import datetime, timedelta
+from card_types import get_card_type, get_all_types, CARD_TYPES
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET")
@@ -130,33 +131,39 @@ def upload():
 
     deck = supabase.table('decks').insert({"title": title, "access_code": code, "created_by": user_id}).execute().data[0]
     
+    # Card Type Logic
+    card_type_code = request.form.get('card_type', 'basic') 
+    handler = get_card_type(card_type_code)
+    if not handler: handler = get_card_type('basic') # Fallback
+
     df = pd.read_excel(file)
     questions = []
     
-    # Detect Type
-    is_quiz = 'Option1' in df.columns
-    
     for _, row in df.iterrows():
-        q_data = {
-            "deck_id": deck['id'],
-            "question_text": str(row['Question']),
-            "correct_answer": str(row['CorrectAnswer'])
-        }
+        try:
+            q_data = handler.parse_row(row)
+            q_data["deck_id"] = deck['id']
+            # Optional: server-side validation here
+            questions.append(q_data)
+        except Exception as e:
+            print(f"Skipping row due to error: {e}")
+            continue
         
-        if is_quiz:
-            q_data["options"] = [
-                str(row.get('Option1', '')), 
-                str(row.get('Option2', '')), 
-                str(row.get('Option3', '')), 
-                str(row.get('Option4', ''))
-            ]
-        else:
-            q_data["options"] = [] # Empty list for Flashcard mode
-            
-        questions.append(q_data)
+    if questions:
+        supabase.table('questions').insert(questions).execute()
         
-    supabase.table('questions').insert(questions).execute()
     return redirect('/dashboard')
+
+@app.route('/api/card_types')
+def get_card_types_api():
+    types = []
+    for ct in get_all_types():
+        types.append({
+            "code": ct.code,
+            "name": ct.name,
+            "instructions": ct.get_import_instructions()
+        })
+    return jsonify(types)
 
 @app.route('/join', methods=['POST'])
 def join_deck():
@@ -301,7 +308,7 @@ def add_card():
         "deck_id": data['deck_id'],
         "question_text": data['question'],
         "correct_answer": data['answer'],
-        "options": ["nan", "nan", "nan", "nan"]
+        "options": data.get('options', ["nan", "nan", "nan", "nan"])
     }
     res = supabase.table('questions').insert(new_card).execute()
     return jsonify(res.data[0])
@@ -315,6 +322,8 @@ def update_card():
         "question_text": data['question'],
         "correct_answer": data['answer']
     }
+    if 'options' in data:
+        update_data['options'] = data['options']
     res = supabase.table('questions').update(update_data).eq("id", data['id']).execute()
     return jsonify(res.data[0])
 
@@ -327,4 +336,5 @@ def delete_card():
     return jsonify({"ok": True})
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port, debug=True)

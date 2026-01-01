@@ -8,6 +8,17 @@
             <h3>📂 Create Deck</h3>
             <form action="/upload" method="post" enctype="multipart/form-data" style="margin-top: 15px;">
                 <input type="text" name="title" placeholder="Deck Title" required>
+                <label style="display:block; margin: 10px 0 5px; font-size: 0.9rem;">Deck Type</label>
+                <select name="card_type" id="uploadCardType"
+                    style="width: 100%; padding: 8px; margin-bottom: 10px; border-radius: 5px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white;">
+                    <!-- Populated by JS -->
+                </select>
+
+                <div id="importInstructions"
+                    style="background: rgba(0,0,0,0.2); padding: 10px; border-radius: 5px; margin-bottom: 10px; font-size: 0.85rem; color: var(--text-muted);">
+                    <!-- Dynamic Instructions -->
+                </div>
+
                 <div style="display: flex; gap: 10px;">
                     <input type="file" name="file" accept=".xlsx" required style="margin-bottom: 0;">
                     <button type="submit" class="btn btn-primary">Upload</button>
@@ -199,5 +210,28 @@
         if (event.target == document.getElementById('renameModal')) closeModal();
         if (event.target == document.getElementById('customStudyModal')) closeCustomModal();
     }
+
+    // --- Upload Form Handler ---
+    async function initUploadForm() {
+        try {
+            const res = await fetch('/api/card_types');
+            const types = await res.json();
+            const sel = document.getElementById('uploadCardType');
+            const info = document.getElementById('importInstructions');
+
+            sel.innerHTML = types.map(t => `<option value="${t.code}">${t.name}</option>`).join('');
+
+            // Helper to update text
+            const updateInfo = () => {
+                const type = types.find(t => t.code === sel.value);
+                if (type) info.innerHTML = type.instructions;
+            };
+
+            sel.addEventListener('change', updateInfo);
+            updateInfo(); // Init
+
+        } catch (e) { console.error("Failed to load types", e); }
+    }
+    initUploadForm();
 </script>
 {% endblock %}
