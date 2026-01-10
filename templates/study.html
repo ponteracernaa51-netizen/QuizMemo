@@ -143,9 +143,11 @@
             optsContainer.innerHTML = '';
             isQuizAnswered = false;
 
-            // Shuffle options for display? Or keep order? Let's keep order for now or shuffle if desired.
-            // Usually options in Excel are fixed A,B,C,D.
-            card.options.forEach(opt => {
+            // Shuffle options
+            let shuffledOptions = [...card.options];
+            shuffleArray(shuffledOptions);
+
+            shuffledOptions.forEach(opt => {
                 const btn = document.createElement('button');
                 btn.className = 'quiz-btn';
                 btn.innerText = opt;
@@ -207,6 +209,12 @@
 
         currentIndex++;
         showCard();
+    }
+    function shuffleArray(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
     }
 </script>
 {% endblock %}
