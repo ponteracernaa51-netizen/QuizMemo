@@ -56,6 +56,7 @@
                 {% endif %}
                 <button class="action-btn" onclick="openCustomStudyModal('{{ d.id }}')"
                     title="Study Options">🎓</button>
+                <button class="action-btn" onclick="openRealTestModal('{{ d.id }}')" title="Real Test">🎯</button>
 
                 <form action="/deck/{{ d.id }}/delete" method="POST" onsubmit="return confirm('Are you sure?')"
                     style="display: inline;">
@@ -95,6 +96,31 @@
 </div>
 
 <!-- Modals -->
+<div id="realTestModal" class="modal">
+    <div class="modal-content">
+        <div class="flex-between" style="margin-bottom: 20px;">
+            <h3>🎯 Real Test Mode</h3>
+            <button onclick="closeRealTestModal()"
+                style="background:none; border:none; color:white; font-size: 1.5rem; cursor:pointer;">&times;</button>
+        </div>
+
+        <p style="color: var(--text-muted); margin-bottom: 15px;">
+            Select how many questions you want to solve. Results will be shown at the end. Note: This mode does not
+            affect your study progress (spaced repetition).
+        </p>
+
+        <div style="margin-top: 10px;">
+            <span style="font-size: 0.9rem;">Number of questions:</span>
+            <input type="number" id="realTestCount" value="20" min="1"
+                style="margin-bottom: 20px; margin-top: 5px; width: 100%;">
+        </div>
+
+        <div style="display: flex; gap: 10px; justify-content: flex-end;">
+            <button class="btn btn-secondary" onclick="closeRealTestModal()">Cancel</button>
+            <button class="btn btn-primary" onclick="startRealTest()">Start Test</button>
+        </div>
+    </div>
+</div>
 <div id="renameModal" class="modal">
     <div class="modal-content">
         <h3>Rename Deck</h3>
@@ -209,6 +235,23 @@
     window.onclick = function (event) {
         if (event.target == document.getElementById('renameModal')) closeModal();
         if (event.target == document.getElementById('customStudyModal')) closeCustomModal();
+        if (event.target == document.getElementById('realTestModal')) closeRealTestModal();
+    }
+
+    // --- Real Test Modal ---
+    let currentDeckIdForTest = null;
+    function openRealTestModal(deckId) {
+        currentDeckIdForTest = deckId;
+        document.getElementById('realTestModal').style.display = 'block';
+    }
+    function closeRealTestModal() {
+        document.getElementById('realTestModal').style.display = 'none';
+    }
+    function startRealTest() {
+        const count = document.getElementById('realTestCount').value;
+        if (currentDeckIdForTest) {
+            window.location.href = `/study/${currentDeckIdForTest}?mode=real_test&count=${count}`;
+        }
     }
 
     // --- Upload Form Handler ---
