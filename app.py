@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 from card_types import get_card_type, get_all_types, CARD_TYPES
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("FLASK_SECRET")
+app.secret_key = os.environ.get("FLASK_SECRET", "super_secret_fallback_key_for_dev")
 
 @app.route('/')
 def index():
@@ -25,7 +25,7 @@ def auth():
 
     if action == 'register':
         hp = generate_password_hash(password)
-        res = supabase.table('users').insert({"email": email, "password_hash": hp}).execute()
+        res = supabase.table('users').insert({"email": email, "password": hp}).execute()
         if not res.data: return "Registration Error", 400
         user = res.data[0]
     else:
@@ -276,6 +276,26 @@ def apply_custom(deck_id):
             supabase.table('user_progress').update({"next_review": now_iso}).in_("question_id", target_ids).eq("user_id", user_id).execute()
 
     return jsonify({"status": "ok"})
+
+@app.route('/api/deck/<int:deck_id>/real_test')
+def real_test_api(deck_id):
+    if not session.get('user'): return jsonify([])
+    try:
+        count = int(request.args.get('count', 20))
+    except:
+        count = 20
+        
+    questions = supabase.table('questions').select("*").eq("deck_id", deck_id).execute().data or []
+    
+    # Shuffle and slice
+    random.shuffle(questions)
+    selected_questions = questions[:count]
+    
+    # Add dummy progress so frontend doesn't break (it expects 'current_progress')
+    for q in selected_questions:
+        q['current_progress'] = {"interval": 0, "repetitions": 0, "ease_factor": 2.5}
+        
+    return jsonify(selected_questions)
 
 @app.route('/logout')
 def logout():
