@@ -99,13 +99,26 @@
 
 <script>
     const deckId = {{ deck_id }};
+    const urlParams = new URLSearchParams(window.location.search);
+    const mode = urlParams.get('mode'); // 'real_test' or null
+    const count = urlParams.get('count') || 20;
+
     let cards = [];
     let currentIndex = 0;
     let isFlipped = false;
     let isQuizAnswered = false;
 
+    // Real Test Stats
+    let score = 0;
+
     // Load cards
-    fetch(`/api/cards/${deckId}`)
+    let fetchUrl = `/api/cards/${deckId}`;
+    if (mode === 'real_test') {
+        fetchUrl = `/api/deck/${deckId}/real_test?count=${count}`;
+        document.getElementById('progress-text').innerText = "Real Test Mode";
+    }
+
+    fetch(fetchUrl)
         .then(r => r.json())
         .then(data => {
             cards = data;
@@ -114,23 +127,24 @@
                 document.getElementById('study-area').classList.remove('hidden');
                 showCard();
             } else {
-                document.getElementById('finished').classList.remove('hidden');
+                showFinished();
             }
         });
 
     function showCard() {
         if (currentIndex >= cards.length) {
-            document.getElementById('study-area').classList.add('hidden');
-            document.getElementById('finished').classList.remove('hidden');
+            showFinished();
             return;
         }
 
         const card = cards[currentIndex];
-        document.getElementById('progress-text').innerText = `Card ${currentIndex + 1} of ${cards.length}`;
+        document.getElementById('progress-text').innerText = mode === 'real_test'
+            ? `Question ${currentIndex + 1} of ${cards.length} | Score: ${score}`
+            : `Card ${currentIndex + 1} of ${cards.length}`;
+
         document.getElementById('controls').classList.add('hidden');
 
         // Determine Mode
-        // Check if options exist and are not empty/nan
         const hasOptions = card.options && card.options.length > 0 && card.options[0] !== 'nan' && card.options[0] !== '';
 
         if (hasOptions) {
@@ -143,7 +157,6 @@
             optsContainer.innerHTML = '';
             isQuizAnswered = false;
 
-            // Shuffle options
             let shuffledOptions = [...card.options];
             shuffleArray(shuffledOptions);
 
@@ -164,6 +177,36 @@
 
             document.getElementById('fc-question').innerText = card.question_text;
             document.getElementById('fc-answer').innerText = card.correct_answer;
+
+            // Adjust buttons for real test
+            if (mode === 'real_test') {
+                // We will update the controls HTML dynamically or just reuse rateCard with special logic
+                const controls = document.querySelector('.rating-buttons');
+                controls.innerHTML = `
+                    <button class="rate-btn rate-hard" onclick="rateCardRealTest(false)" style="background:var(--danger)">Incorrect</button>
+                    <button class="rate-btn rate-easy" onclick="rateCardRealTest(true)" style="background:var(--success)">Correct</button>
+                 `;
+            }
+        }
+    }
+
+    function showFinished() {
+        document.getElementById('study-area').classList.add('hidden');
+        const finDiv = document.getElementById('finished');
+        finDiv.classList.remove('hidden');
+
+        if (mode === 'real_test') {
+            const percentage = Math.round((score / cards.length) * 100) || 0;
+            finDiv.innerHTML = `
+                <h2>🎯 Test Completed</h2>
+                <div style="font-size: 3rem; margin: 20px 0; font-weight: bold; color: var(--primary);">
+                    ${percentage}%
+                </div>
+                <p style="margin-bottom: 30px; color: var(--text-muted); font-size: 1.2rem;">
+                    You scored ${score} out of ${cards.length}
+                </p>
+                <a href="/dashboard" class="btn btn-primary">Back to Dashboard</a>
+            `;
         }
     }
 
@@ -182,20 +225,29 @@
 
         if (selected === correct) {
             btn.classList.add('correct');
+            if (mode === 'real_test') score++;
         } else {
             btn.classList.add('wrong');
-            // Highlight correct one
             const allBtns = document.querySelectorAll('.quiz-btn');
             allBtns.forEach(b => {
                 if (b.innerText === correct) b.classList.add('correct');
             });
         }
 
-        // Show rating controls
-        document.getElementById('controls').classList.remove('hidden');
+        if (mode === 'real_test') {
+            // Auto advance after short delay
+            setTimeout(() => {
+                currentIndex++;
+                showCard();
+            }, 1500);
+        } else {
+            document.getElementById('controls').classList.remove('hidden');
+        }
     }
 
     function rateCard(rating) {
+        if (mode === 'real_test') return; // Should not happen but safety check
+
         const card = cards[currentIndex];
 
         fetch('/api/rate', {
@@ -210,6 +262,13 @@
         currentIndex++;
         showCard();
     }
+
+    function rateCardRealTest(isCorrect) {
+        if (isCorrect) score++;
+        currentIndex++;
+        showCard();
+    }
+
     function shuffleArray(array) {
         for (let i = array.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
